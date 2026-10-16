@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Скелет-бродилка — MMORPG стиль</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0f1a; overflow: hidden; touch-action: none; font-family: 'Segoe UI', Arial, sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; background: #1a2a3a; cursor: crosshair; }
+
+        #ui {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 20px 12px 20px;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            border-top: 2px solid rgba(255,215,0,0.2);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            pointer-events: none;
+            box-shadow: 0 -5px 30px rgba(0,0,0,0.8);
+        }
+
+        .player-panel {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 200px;
+        }
+
+        .portrait {
+            width: 56px;
+            height: 56px;
+            border-radius: 10px;
+            border: 2px solid rgba(255,215,0,0.4);
+            background: rgba(20,30,50,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            flex-shrink: 0;
+            box-shadow: 0 0 20px rgba(255,215,0,0.1);
+        }
+
+        .bars {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .bar-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 3px;
+        }
+        .bar-wrap:last-child { margin-bottom: 0; }
+
+        .bar-label {
+            color: #aaa;
+            font-size: 11px;
+            font-weight: bold;
+            width: 18px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .bar-track {
+            flex: 1;
+            height: 14px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid rgba(255,255,255,0.06);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 8px;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .bar-fill.hp { background: linear-gradient(90deg, #cc2233, #ff4455); }
+        .bar-fill.energy { background: linear-gradient(90deg, #2266cc, #44aaff); }
+        .bar-fill.exp { background: linear-gradient(90deg, #8844aa, #cc66ff); }
+
+        .bar-text {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+            letter-spacing: 0.3px;
+        }
+
+        .bar-text.level-text {
+            right: auto;
+            left: 6px;
+            font-size: 11px;
+            color: #ffd700;
+        }
+
+        .center-panel {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .level-box {
+            text-align: center;
+            padding: 0 10px;
+            border-right: 1px solid rgba(255,255,255,0.08);
+            padding-right: 18px;
+        }
+        .level-box .lvl {
+            color: #ffd700;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(255,215,0,0.2);
+        }
+        .level-box .lvl-label {
+            color: #888;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .race-box {
+            text-align: center;
+            padding: 0 10px;
+            border-right: 1px solid rgba(255,255,255,0.08);
+            padding-right: 18px;
+        }
+        .race-box .race-name {
+            color: #ffd700;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .race-box .race-label {
+            color: #888;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stats-box {
+            display: flex;
+            gap: 14px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-item .val {
+            color: #d4a0ff;
+            font-size: 15px;
+            font-weight: bold;
+        }
+        .stat-item .lbl {
+            color: #666;
+            font-size: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .right-panel {
+            text-align: right;
+            min-width: 100px;
+        }
+        .right-panel .exp-info {
+            color: #aaa;
+            font-size: 12px;
+        }
+        .right-panel .exp-info span {
+            color: #cc66ff;
+            font-weight: bold;
+        }
+        .right-panel .info-text {
+            color: #666;
+            font-size: 10px;
+            margin-top: 2px;
+        }
+
+        #abilityHint {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #aaffaa;
+            background: rgba(0,0,0,0.8);
+            padding: 8px 22px;
+            border-radius: 12px;
+            font-size: 14px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(170,255,170,0.2);
+            pointer-events: none;
+            z-index: 101;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        #abilityHint.show { opacity: 1; }
+
+        #levelUp {
+            position: fixed;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #ffd700;
+            background: rgba(0,0,0,0.9);
+            padding: 40px 60px;
+            border-radius: 20px;
+            font-size: 40px;
+            font-weight: bold;
+            backdrop-filter: blur(15px);
+            border: 3px solid #ffd700;
+            pointer-events: none;
+            z-index: 200;
+            opacity: 0;
+            transition: opacity 0.5s;
+            text-align: center;
+            box-shadow: 0 0 80px rgba(255,215,0,0.2);
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        #levelUp.show { opacity: 1; }
+        #levelUp .sub {
+            font-size: 18px;
+            color: #aaa;
+            font-weight: normal;
+            margin-top: 10px;
+        }
+
+        #raceMenu {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            backdrop-filter: blur(10px);
+            pointer-events: all;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        #raceMenu h1 {
+            color: #ffd700;
+            font-size: 42px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 40px rgba(255,215,0,0.2);
+            letter-spacing: 2px;
+        }
+        .race-options {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .race-card {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 30px 40px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            min-width: 180px;
+            pointer-events: all;
+        }
+        .race-card:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: #ffd700;
+            transform: scale(1.05);
+            box-shadow: 0 0 40px rgba(255,215,0,0.1);
+        }
+        .race-card .emoji { font-size: 56px; display: block; margin-bottom: 8px; }
+        .race-card .name { color: white; font-size: 22px; font-weight: bold; }
+        .race-card .desc { color: #888; font-size: 13px; margin-top: 6px; }
+        .race-card .ability { color: #6bcfff; font-size: 12px; margin-top: 4px; }
+
+        @media (max-width: 768px) {
+            #ui { padding: 6px 12px 10px 12px; flex-direction: column; align-items: stretch; gap: 4px; }
+            .player-panel { min-width: unset; }
+            .portrait { width: 40px; height: 40px; font-size: 24px; }
+            .bar-track { height: 12px; }
+            .bar-text { font-size: 9px; }
+            .center-panel { gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+            .level-box .lvl { font-size: 16px; }
+            .stats-box { gap: 8px; }
+            .stat-item .val { font-size: 13px; }
+            .right-panel .exp-info { font-size: 10px; }
+            .race-box .race-name { font-size: 14px; }
+            .race-card { padding: 20px 25px; min-width: 130px; }
+            .race-card .emoji { font-size: 40px; }
+            #raceMenu h1 { font-size: 28px; }
+            #levelUp { font-size: 28px; padding: 25px 30px; }
+            .level-box { border-right: none; padding-right: 8px; }
+            .race-box { border-right: none; padding-right: 8px; }
+        }
+        @media (max-width: 480px) {
+            .stats-box { gap: 4px; }
+            .stat-item .val { font-size: 11px; }
+            .stat-item .lbl { font-size: 7px; }
+            .bar-track { height: 10px; }
+            .bar-text { font-size: 8px; }
+            .portrait { width: 34px; height: 34px; font-size: 20px; }
+            .level-box .lvl { font-size: 14px; }
+            .race-box .race-name { font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="raceMenu">
+        <h1>⚔️ ВЫБЕРИ РАСУ</h1>
+        <div class="race-options">
+            <div class="race-card" data-race="skeleton">
+                <span class="emoji">🦴</span>
+                <div class="name">Скелет</div>
+                <div class="desc">Выносливость +, здоровье</div>
+                <div class="ability">[Enter] Поглотить кость → HP</div>
+            </div>
+            <div class="race-card" data-race="zombie">
+                <span class="emoji">🧟</span>
+                <div class="name">Зомби</div>
+                <div class="desc">Сила +, чума вокруг</div>
+                <div class="ability">[Enter] Чума: 13% урона/сек</div>
+            </div>
+            <div class="race-card" data-race="shadow">
+                <span class="emoji">👻</span>
+                <div class="name">Тень</div>
+                <div class="desc">Ловкость +, невидимость</div>
+                <div class="ability">[Enter] Невидимость + бесплотность</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="ui">
+        <div class="player-panel">
+            <div class="portrait" id="portraitEmoji">🦴</div>
+            <div class="bars">
+                <div class="bar-wrap">
+                    <span class="bar-label">❤️</span>
+                    <div class="bar-track">
+                        <div class="bar-fill hp" id="hpBar" style="width:100%"></div>
+                        <span class="bar-text" id="hpText">100/100</span>
+                    </div>
+                </div>
+                <div class="bar-wrap">
+                    <span class="bar-label">⚡</span>
+                    <div class="bar-track">
+                        <div class="bar-fill energy" id="energyBar" style="width:100%"></div>
+                        <span class="bar-text" id="energyText">100/100</span>
+                    </div>
+                </div>
+                <div class="bar-wrap">
+                    <span class="bar-label">⭐</span>
+                    <div class="bar-track">
+                        <div class="bar-fill exp" id="expBar" style="width:0%"></div>
+                        <span class="bar-text level-text" id="levelText">УР. 1</span>
+                        <span class="bar-text" id="expText">0 / 20</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="center-panel">
+            <div class="level-box">
+                <div class="lvl" id="lvlDisplay">1</div>
+                <div class="lvl-label">Уровень</div>
+            </div>
+            <div class="race-box">
+                <div class="race-name" id="raceNameDisplay">—</div>
+                <div class="race-label">Раса</div>
+            </div>
+            <div class="stats-box">
+                <div class="stat-item">
+                    <div class="val" id="strDisplay">10</div>
+                    <div class="lbl">⚔️ Сила</div>
+                </div>
+                <div class="stat-item">
+                    <div class="val" id="vitDisplay">10</div>
+                    <div class="lbl">🛡️ Вын</div>
+                </div>
+                <div class="stat-item">
+                    <div class="val" id="agiDisplay">10</div>
+                    <div class="lbl">🏃 Ловк</div>
+                </div>
+                <div class="stat-item">
+                    <div class="val" id="intDisplay">10</div>
+                    <div class="lbl">🧠 Инт</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="exp-info">
+                Опыт: <span id="expTotalDisplay">0</span>
+            </div>
+            <div class="info-text" id="infoText">🖱️ Клик по крестьянину — атака</div>
+        </div>
+    </div>
+
+    <div id="abilityHint">⚡ СПОСОБНОСТЬ ГОТОВА</div>
+    <div id="levelUp">
+        ⬆️ УРОВЕНЬ ПОВЫШЕН!
+        <div class="sub" id="levelUpSub">+2 ко всем статам</div>
+    </div>
+
+    <canvas id="game"></canvas>
+
+    <script>
+        // ---------- НАЧАЛЬНЫЕ НАСТРОЙКИ ----------
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+
+        const portraitEmoji = document.getElementById('portraitEmoji');
+        const hpBar = document.getElementById('hpBar');
+        const hpText = document.getElementById('hpText');
+        const energyBar = document.getElementById('energyBar');
+        const energyText = document.getElementById('energyText');
+        const expBar = document.getElementById('expBar');
+        const expText = document.getElementById('expText');
+        const levelText = document.getElementById('levelText');
+        const lvlDisplay = document.getElementById('lvlDisplay');
+        const raceNameDisplay = document.getElementById('raceNameDisplay');
+        const strDisplay = document.getElementById('strDisplay');
+        const vitDisplay = document.getElementById('vitDisplay');
+        const agiDisplay = document.getElementById('agiDisplay');
+        const intDisplay = document.getElementById('intDisplay');
+        const expTotalDisplay = document.getElementById('expTotalDisplay');
+        const infoText = document.getElementById('infoText');
+        const abilityHint = document.getElementById('abilityHint');
+        const levelUpDiv = document.getElementById('levelUp');
+        const levelUpSub = document.getElementById('levelUpSub');
+        const raceMenu = document.getElementById('raceMenu');
+
+        let W, H;
+        function resize() {
+            W = window.innerWidth; H = window.innerHeight;
+            canvas.width = W; canvas.height = H;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const WORLD_W = 3000, WORLD_H = 2000;
+        const MAX_LEVEL = 13;
+
+        // ---------- ИГРОК ----------
+        const player = {
+            x: 200, y: 200,
+            speed: 4,
+            targetX: 200, targetY: 200,
+            isMoving: false,
+            radius: 15,
+            get sortY() { return this.y + 20; },
+
+            baseStr: 10,
+            baseVit: 10,
+            baseAgi: 10,
+            baseInt: 10,
+
+            get str() { return this.baseStr + (this.level - 1) * 2; },
+            get vit() { return this.baseVit + (this.level - 1) * 2; },
+            get agi() { return this.baseAgi + (this.level - 1) * 2; },
+            get int() { return this.baseInt + (this.level - 1) * 2; },
+
+            hp: 100,
+            maxHp: 100,
+            energy: 100,
+            maxEnergy: 100,
+            race: 'skeleton',
+            raceEmoji: '🦴',
+
+            level: 1,
+            exp: 0,
+            expToNext: 20,
+
+            attackTarget: null,
+            attacking: false,
+            attackCooldown: 0,
+            attackDamage: 12,
+
+            abilityCooldown: 0,
+            abilityActive: false,
+            abilityTimer: 0,
+
+            invisible: false,
+            ghost: false,
+        };
+
+        // Массив для партиклов (эффектов)
+        let particles = [];
+
+        // Функция создания партиклов
+        function spawnParticles(x, y, color, count = 20, speed = 5, life = 40, size = 5) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const vel = 1 + Math.random() * speed;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * vel,
+                    vy: Math.sin(angle) * vel - 1,
+                    life: life * (0.5 + Math.random() * 0.5),
+                    maxLife: life,
+                    size: size * (0.5 + Math.random() * 0.5),
+                    color: color,
+                });
+            }
+        }
+
+        // Эффект вспышки атаки
+        function spawnSlash(x, y, angle) {
+            for (let i = 0; i < 15; i++) {
+                const a = angle + (Math.random() - 0.5) * 1.2;
+                const vel = 2 + Math.random() * 5;
+                particles.push({
+                    x: x + Math.cos(angle) * 20,
+                    y: y + Math.sin(angle) * 20,
+                    vx: Math.cos(a) * vel,
+                    vy: Math.sin(a) * vel,
+                    life: 15 + Math.random() * 15,
+                    maxLife: 30,
+                    size: 3 + Math.random() * 5,
+                    color: `hsl(${40 + Math.random() * 30}, 100%, 70%)`,
+                });
+            }
+        }
+
+        const camera = { x: 0, y: 0 };
+
+        // ---------- МИР ----------
+        const bones = [];
+        const BONE_COUNT = 22;
+        const BONE_RADIUS = 12;
+
+        let peasants = [];
+        const PEASANT_COUNT = 8;
+
+        const buildings = [];
+        const buildingColors = ['#5d3a1a','#4a2e1b','#6b4a2d','#3d2b1f','#5a3f28','#4d3220','#6d4c34','#3e2c1e','#5b3f2a','#4a3424','#634830'];
+        for (let i = 0; i < 30; i++) {
+            const w = 60 + Math.random() * 150, h = 60 + Math.random() * 150;
+            buildings.push({
+                x: 100 + Math.random() * (WORLD_W - 200),
+                y: 100 + Math.random() * (WORLD_H - 200),
+                w, h,
+                color: buildingColors[Math.floor(Math.random() * buildingColors.length)],
+                get sortY() { return this.y + this.h; },
+                type: 'building'
+            });
+        }
+
+        const trees = [];
+        for (let i = 0; i < 40; i++) {
+            const r = 15 + Math.random() * 25;
+            trees.push({
+                x: 50 + Math.random() * (WORLD_W - 100),
+                y: 50 + Math.random() * (WORLD_H - 100),
+                r, get sortY() { return this.y + this.r * 0.6; },
+                type: 'tree'
+            });
+        }
+
+        // ---------- КОЛЛИЗИИ (ДЕРЕВЬЯ — ТОЛЬКО НИЖНИЕ 40%) ----------
+        function isTreeBlocked(x, y, radius = 15) {
+            for (let t of trees) {
+                const dx = x - t.x, dy = y - t.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < t.r + radius) {
+                    const relY = y - t.y;
+                    if (relY > -t.r * 0.6) return true;
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        function isBlocked(x, y, radius = 15) {
+            if (x - radius < 0 || x + radius > WORLD_W) return true;
+            if (y - radius < 0 || y + radius > WORLD_H) return true;
+            if (isTreeBlocked(x, y, radius)) return true;
+            if (isInsideBuilding(x, y, radius)) return true;
+            return false;
+        }
+
+        function isBlockedGhost(x, y, radius = 15) {
+            if (x - radius < 0 || x + radius > WORLD_W) return true;
+            if (y - radius < 0 || y + radius > WORLD_H) return true;
+            return false;
+        }
+
+        function isInsideBuilding(x, y, radius = 15) {
+            for (let b of buildings) {
+                const closestX = Math.max(b.x, Math.min(x, b.x + b.w));
+                const closestY = Math.max(b.y, Math.min(y, b.y + b.h));
+                const dx = x - closestX, dy = y - closestY;
+                if (dx*dx + dy*dy < radius*radius) {
+                    const relY = y - b.y;
+                    if (relY > b.h * 0.6) return true;
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        function canMoveTo(x, y, oldX, oldY, radius = 15) {
+            if (player.ghost) return true;
+            for (let b of buildings) {
+                const bottomY = b.y + b.h * 0.6;
+                const minX = Math.min(oldX, x), maxX = Math.max(oldX, x);
+                const minY = Math.min(oldY, y), maxY = Math.max(oldY, y);
+                if (maxX < b.x || minX > b.x + b.w || maxY < bottomY || minY > b.y + b.h) continue;
+                const steps = 10;
+                for (let i = 0; i <= steps; i++) {
+                    const t = i / steps;
+                    const checkX = oldX + (x - oldX) * t;
+                    const checkY = oldY + (y - oldY) * t;
+                    if (checkX > b.x - radius && checkX < b.x + b.w + radius &&
+                        checkY > b.y + b.h * 0.6 - radius && checkY < b.y + b.h + radius) {
+                        return false;
+                    }
+                }
+            }
+            for (let t of trees) {
+                const bottomY = t.y + t.r * 0.4;
+                const minX = Math.min(oldX, x), maxX = Math.max(oldX, x);
+                const minY = Math.min(oldY, y), maxY = Math.max(oldY, y);
+                if (maxX < t.x - t.r || minX > t.x + t.r || maxY < t.y - t.r || minY > t.y + t.r) continue;
+                const steps = 10;
+                for (let i = 0; i <= steps; i++) {
+                    const t2 = i / steps;
+                    const checkX = oldX + (x - oldX) * t2;
+                    const checkY = oldY + (y - oldY) * t2;
+                    const dx = checkX - t.x, dy = checkY - t.y;
+                    if (dx*dx + dy*dy < (t.r + radius)*(t.r + radius)) {
+                        if (checkY > t.y - t.r * 0.6) return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+        // ---------- ГЕНЕРАЦИЯ ----------
+        function generateBones() {
+            bones.length = 0;
+            for (let i = 0; i < BONE_COUNT; i++) {
+                let x, y, valid, attempts = 0;
+                do {
+                    x = 60 + Math.random() * (WORLD_W - 120);
+                    y = 60 + Math.random() * (WORLD_H - 120);
+                    valid = true;
+                    for (let b of buildings) {
+                        if (x > b.x - BONE_RADIUS && x < b.x + b.w + BONE_RADIUS &&
+                            y > b.y - BONE_RADIUS && y < b.y + b.h + BONE_RADIUS) { valid = false; break; }
+                    }
+                    for (let t of trees) {
+                        const dx = x - t.x, dy = y - t.y;
+                        if (dx*dx + dy*dy < (t.r + BONE_RADIUS)*(t.r + BONE_RADIUS)) { valid = false; break; }
+                    }
+                    if (Math.abs(x - player.x) < 80 && Math.abs(y - player.y) < 80) valid = false;
+                    attempts++;
+                    if (attempts > 100) break;
+                } while (!valid);
+                bones.push({ x, y, collected: false, radius: BONE_RADIUS, get sortY() { return this.y + this.radius; }, phase: Math.random() * Math.PI * 2 });
+            }
+        }
+
+        function spawnPeasants() {
+            peasants = [];
+            for (let i = 0; i < PEASANT_COUNT; i++) {
+                let x, y, valid, attempts = 0;
+                do {
+                    x = 80 + Math.random() * (WORLD_W - 160);
+                    y = 80 + Math.random() * (WORLD_H - 160);
+                    valid = true;
+                    for (let b of buildings) {
+                        if (x > b.x - 20 && x < b.x + b.w + 20 && y > b.y - 20 && y < b.y + b.h + 20) { valid = false; break; }
+                    }
+                    for (let t of trees) {
+                        const dx = x - t.x, dy = y - t.y;
+                        if (dx*dx + dy*dy < (t.r + 25)*(t.r + 25)) { valid = false; break; }
+                    }
+                    if (Math.abs(x - player.x) < 150 && Math.abs(y - player.y) < 150) valid = false;
+                    attempts++;
+                    if (attempts > 150) break;
+                } while (!valid);
+                peasants.push({
+                    x, y, radius: 18,
+                    alive: true,
+                    hp: 100,
+                    maxHp: 100,
+                    level: 1,
+                    get sortY() { return this.y + 20; },
+                    phase: Math.random() * 100,
+                    attackCooldown: 0,
+                    damage: 6,
+                    attackRange: 40,
+                    state: 'idle',
+                    targetX: x, targetY: y,
+                    speed: 1.2 + Math.random() * 0.6,
+                    plagueTimer: 0,
+                });
+            }
+        }
+
+        generateBones();
+        spawnPeasants();
+
+        // ---------- СИСТЕМА УРОВНЕЙ ----------
+        function getExpToLevel(level) {
+            return Math.floor(20 + level * 8 + Math.pow(level, 1.5) * 2);
+        }
+
+        function addExp(amount) {
+            player.exp += amount;
+            while (player.exp >= player.expToNext && player.level < MAX_LEVEL) {
+                player.exp -= player.expToNext;
+                player.level++;
+                player.expToNext = getExpToLevel(player.level);
+                levelUp();
+            }
+            if (player.level >= MAX_LEVEL) {
+                player.exp = player.expToNext - 1;
+            }
+            updateUI();
+        }
+
+        function levelUp() {
+            player.hp = player.maxHp;
+            player.energy = player.maxEnergy;
+            spawnParticles(player.x, player.y, '#ffd700', 50, 8, 50, 8);
+            levelUpDiv.classList.add('show');
+            levelUpSub.textContent = `+2 ко всем статам! Уровень ${player.level}`;
+            setTimeout(() => {
+                levelUpDiv.classList.remove('show');
+            }, 2000);
+            infoText.textContent = `⬆️ УРОВЕНЬ ${player.level}! Статы повышены!`;
+            updateUI();
+        }
+
+        // ---------- ВЫБОР РАСЫ ----------
+        let raceChosen = false;
+        document.querySelectorAll('.race-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const race = card.dataset.race;
+                player.race = race;
+                const emojis = { skeleton: '🦴', zombie: '🧟', shadow: '👻' };
+                player.raceEmoji = emojis[race] || '🦴';
+                portraitEmoji.textContent = player.raceEmoji;
+                
+                if (race === 'skeleton') {
+                    player.baseVit = 12; player.baseStr = 10; player.baseAgi = 10; player.baseInt = 8;
+                    raceNameDisplay.textContent = 'Скелет';
+                } else if (race === 'zombie') {
+                    player.baseVit = 10; player.baseStr = 14; player.baseAgi = 8; player.baseInt = 10;
+                    raceNameDisplay.textContent = 'Зомби';
+                } else if (race === 'shadow') {
+                    player.baseVit = 8; player.baseStr = 8; player.baseAgi = 14; player.baseInt = 12;
+                    raceNameDisplay.textContent = 'Тень';
+                }
+                player.maxHp = 80 + player.vit * 2;
+                player.hp = player.maxHp;
+                player.maxEnergy = 80 + player.int * 2;
+                player.energy = player.maxEnergy;
+                player.speed = 3.5 + player.agi * 0.1;
+                player.expToNext = getExpToLevel(1);
+                raceMenu.style.display = 'none';
+                raceChosen = true;
+                infoText.textContent = '🖱️ Клик по крестьянину — атака | Enter — способность';
+                updateUI();
+                recalculatePeasantHealth();
+            });
+        });
+
+        function recalculatePeasantHealth() {
+            const playerDamage = player.attackDamage + player.str * 0.5;
+            for (let p of peasants) {
+                p.maxHp = Math.max(20, playerDamage * 5);
+                p.hp = p.maxHp;
+            }
+        }
+
+        // ---------- UI ОБНОВЛЕНИЕ ----------
+        function updateUI() {
+            const hpPct = Math.max(0, (player.hp / player.maxHp) * 100);
+            const enPct = Math.max(0, (player.energy / player.maxEnergy) * 100);
+            const expPct = Math.max(0, (player.exp / player.expToNext) * 100);
+
+            hpBar.style.width = hpPct + '%';
+            hpText.textContent = `${Math.round(player.hp)}/${Math.round(player.maxHp)}`;
+            
+            energyBar.style.width = enPct + '%';
+            energyText.textContent = `${Math.round(player.energy)}/${Math.round(player.maxEnergy)}`;
+            
+            expBar.style.width = expPct + '%';
+            expText.textContent = `${Math.floor(player.exp)} / ${player.expToNext}`;
+            levelText.textContent = `УР. ${player.level}`;
+            
+            lvlDisplay.textContent = player.level;
+            strDisplay.textContent = player.str;
+            vitDisplay.textContent = player.vit;
+            agiDisplay.textContent = player.agi;
+            intDisplay.textContent = player.int;
+            expTotalDisplay.textContent = Math.floor(player.exp);
+        }
+
+        // ---------- СПОСОБНОСТИ ----------
+        function useAbility() {
+            if (!raceChosen) {
+                abilityHint.textContent = '⚠️ СНАЧАЛА ВЫБЕРИ РАСУ!';
+                abilityHint.classList.add('show');
+                setTimeout(() => abilityHint.classList.remove('show'), 1500);
+                return;
+            }
+            if (player.abilityCooldown > 0) {
+                abilityHint.textContent = `⏳ ПЕРЕЗАРЯДКА ${Math.ceil(player.abilityCooldown/60)}с`;
+                abilityHint.classList.add('show');
+                setTimeout(() => abilityHint.classList.remove('show'), 1000);
+                return;
+            }
+            if (player.energy < 25) {
+                abilityHint.textContent = '⚠️ НЕДОСТАТОЧНО ЭНЕРГИИ (25)';
+                abilityHint.classList.add('show');
+                setTimeout(() => abilityHint.classList.remove('show'), 1200);
+                return;
+            }
+
+            const race = player.race;
+            let abilityUsed = false;
+
+            if (race === 'skeleton') {
+                let closestBone = null;
+                let closestDist = Infinity;
+                for (let bone of bones) {
+                    if (bone.collected) continue;
+                    const d = dist(player, bone);
+                    if (d < 150 && d < closestDist) {
+                        closestDist = d;
+                        closestBone = bone;
+                    }
+                }
+                if (closestBone) {
+                    closestBone.collected = true;
+                    player.hp = Math.min(player.maxHp, player.hp + 25 + player.int * 0.5);
+                    player.energy -= 25;
+                    player.abilityCooldown = 120;
+                    abilityUsed = true;
+                    spawnParticles(closestBone.x, closestBone.y, '#ffaa44', 30, 6, 30, 6);
+                    abilityHint.textContent = '❤️ +HP (кость поглощена)';
+                    abilityHint.classList.add('show');
+                    setTimeout(() => abilityHint.classList.remove('show'), 1200);
+                    addExp(5);
+                } else {
+                    abilityHint.textContent = '❌ НЕТ КОСТЕЙ РЯДОМ (150px)';
+                    abilityHint.classList.add('show');
+                    setTimeout(() => abilityHint.classList.remove('show'), 1200);
+                    return;
+                }
+            } else if (race === 'zombie') {
+                player.abilityActive = true;
+                player.abilityTimer = 300;
+                player.energy -= 30;
+                player.abilityCooldown = 300;
+                abilityUsed = true;
+                spawnParticles(player.x, player.y, '#00ff44', 40, 7, 40, 7);
+                abilityHint.textContent = '☠️ ЧУМА АКТИВИРОВАНА! 13%/сек';
+                abilityHint.classList.add('show');
+                setTimeout(() => abilityHint.classList.remove('show'), 1200);
+                applyPlagueDamage();
+            } else if (race === 'shadow') {
+                player.invisible = true;
+                player.ghost = true;
+                player.abilityTimer = 180 + player.agi * 0.5;
+                player.energy -= 30;
+                player.abilityCooldown = 360;
+                abilityUsed = true;
+                spawnParticles(player.x, player.y, '#8888ff', 35, 5, 35, 6);
+                abilityHint.textContent = '👻 НЕВИДИМОСТЬ + БЕСПЛОТНОСТЬ';
+                abilityHint.classList.add('show');
+                setTimeout(() => abilityHint.classList.remove('show'), 1200);
+            }
+
+            if (abilityUsed) {
+                updateUI();
+            }
+        }
+
+        // ---------- УРОН ЧУМЫ ----------
+        function applyPlagueDamage() {
+            if (!player.abilityActive) return;
+            const playerDamage = player.attackDamage + player.str * 0.5;
+            const plagueDamage = playerDamage * 0.13;
+            let hitCount = 0;
+            for (let p of peasants) {
+                if (!p.alive) continue;
+                if (dist(player, p) < 160) {
+                    p.hp -= plagueDamage;
+                    spawnParticles(p.x, p.y, '#66ff66', 8, 3, 15, 4);
+                    if (p.hp <= 0) {
+                        p.alive = false;
+                        hitCount++;
+                        addExp(10);
+                        spawnParticles(p.x, p.y, '#ffaa44', 25, 5, 30, 6);
+                    }
+                }
+            }
+            if (hitCount > 0) {
+                infoText.textContent = `☠️ Чума убила ${hitCount} крестьян!`;
+            }
+            updateUI();
+        }
+
+        // ---------- АТАКА ----------
+        function attackPeasant(peasant) {
+            if (!peasant || !peasant.alive) return false;
+            const damage = player.attackDamage + player.str * 0.5;
+            peasant.hp -= damage;
+            const angle = Math.atan2(peasant.y - player.y, peasant.x - player.x);
+            spawnSlash(peasant.x, peasant.y, angle);
+            spawnParticles(peasant.x, peasant.y, '#ff8844', 12, 4, 20, 5);
+            if (peasant.hp <= 0) {
+                peasant.alive = false;
+                spawnParticles(peasant.x, peasant.y, '#ffaa44', 30, 6, 35, 7);
+                if (Math.random() < 0.5) {
+                    bones.push({
+                        x: peasant.x + (Math.random()-0.5)*30,
+                        y: peasant.y + (Math.random()-0.5)*30,
+                        collected: false,
+                        radius: BONE_RADIUS,
+                        get sortY() { return this.y + this.radius; },
+                        phase: Math.random() * Math.PI * 2
+                    });
+                }
+                addExp(8 + Math.floor(Math.random() * 5));
+                infoText.textContent = `💀 КРЕСТЬЯНИН ПОВЕРЖЕН! +опыт`;
+                return true;
+            } else {
+                const hpPercent = Math.round((peasant.hp / peasant.maxHp) * 100);
+                infoText.textContent = `⚔️ Урон ${Math.round(damage)}! Крестьянин: ${Math.round(peasant.hp)}/${Math.round(peasant.maxHp)} HP (${hpPercent}%)`;
+                return false;
+            }
+        }
+
+        // ---------- УСТАНОВКА ЦЕЛИ ----------
+        function setTarget(worldX, worldY) {
+            if (!raceChosen) return;
+            for (let p of peasants) {
+                if (!p.alive) continue;
+                if (dist({x:worldX, y:worldY}, p) < p.radius + 20) {
+                    player.attackTarget = p;
+                    player.attacking = true;
+                    player.isMoving = false;
+                    infoText.textContent = `⚔️ АТАКУЮ КРЕСТЬЯНИНА!`;
+                    return;
+                }
+            }
+            if (isBlocked(worldX, worldY)) {
+                for (let r = 20; r < 300; r += 10) {
+                    for (let a = 0; a < Math.PI * 2; a += 0.2) {
+                        const px = worldX + Math.cos(a) * r;
+                        const py = worldY + Math.sin(a) * r;
+                        if (!isBlocked(px, py)) {
+                            player.targetX = px; player.targetY = py;
+                            player.isMoving = true;
+                            player.attacking = false;
+                            player.attackTarget = null;
+                            infoText.textContent = `🎯 ИДУ К (${Math.round(px)}, ${Math.round(py)})`;
+                            return;
+                        }
+                    }
+                }
+                infoText.textContent = '❌ НЕТ СВОБОДНОГО МЕСТА';
+                return;
+            }
+            player.targetX = worldX; player.targetY = worldY;
+            player.isMoving = true;
+            player.attacking = false;
+            player.attackTarget = null;
+            infoText.textContent = `🎯 ИДУ К (${Math.round(worldX)}, ${Math.round(worldY)})`;
+        }
+
+        // ---------- ДВИЖЕНИЕ ----------
+        function updateGame() {
+            player.energy = Math.min(player.maxEnergy, player.energy + 0.08 + player.int * 0.005);
+            if (player.abilityCooldown > 0) player.abilityCooldown--;
+            if (player.abilityTimer > 0) {
+                player.abilityTimer--;
+                if (player.race === 'zombie' && player.abilityActive && player.abilityTimer % 60 === 0) {
+                    applyPlagueDamage();
+                }
+                if (player.abilityTimer === 0) {
+                    player.abilityActive = false;
+                    if (player.race === 'shadow') {
+                        player.invisible = false;
+                        player.ghost = false;
+                    }
+                }
+            }
+
+            player.maxHp = 80 + player.vit * 2;
+            player.maxEnergy = 80 + player.int * 2;
+            player.speed = 3.5 + player.agi * 0.1;
+
+            for (let p of peasants) {
+                if (!p.alive) continue;
+                if (p.attackCooldown > 0) p.attackCooldown--;
+                const d = dist(player, p);
+                if (d < 250 && !player.invisible) {
+                    p.state = 'chase';
+                    const angle = Math.atan2(player.y - p.y, player.x - p.x);
+                    const step = p.speed;
+                    let nx = p.x + Math.cos(angle) * step;
+                    let ny = p.y + Math.sin(angle) * step;
+                    if (!isBlocked(nx, ny, p.radius)) {
+                        p.x = nx; p.y = ny;
+                    }
+                    if (d < p.attackRange + player.radius && p.attackCooldown === 0) {
+                        if (!player.ghost) {
+                            const dmg = p.damage - player.vit * 0.1;
+                            player.hp -= Math.max(1, dmg);
+                            p.attackCooldown = 30;
+                            spawnParticles(player.x, player.y, '#ff4444', 10, 3, 15, 4);
+                            infoText.textContent = `💥 КРЕСТЬЯНИН АТАКУЕТ! -${Math.round(Math.max(1, dmg))} HP`;
+                            if (player.hp <= 0) {
+                                player.hp = 0;
+                                infoText.textContent = '💀 ВЫ УМЕРЛИ... ОБНОВИТЕ СТРАНИЦУ';
+                            }
+                            updateUI();
+                        }
+                    }
+                } else {
+                    if (p.state === 'chase') {
+                        p.state = 'idle';
+                    }
+                }
+            }
+
+            // Движение игрока
+            if (player.attacking && player.attackTarget && player.attackTarget.alive) {
+                const target = player.attackTarget;
+                const d = dist(player, target);
+                if (d < 35) {
+                    if (player.attackCooldown <= 0) {
+                        attackPeasant(target);
+                        player.attackCooldown = 20 - Math.min(10, player.agi * 0.2);
+                    }
+                } else {
+                    const angle = Math.atan2(target.y - player.y, target.x - player.x);
+                    const step = Math.min(player.speed, d);
+                    let nx = player.x + Math.cos(angle) * step;
+                    let ny = player.y + Math.sin(angle) * step;
+                    if (player.ghost) {
+                        if (!isBlockedGhost(nx, player.y)) player.x = nx;
+                        if (!isBlockedGhost(player.x, ny)) player.y = ny;
+                    } else {
+                        if (!isBlocked(nx, player.y) && canMoveTo(nx, player.y, player.x, player.y)) player.x = nx;
+                        if (!isBlocked(player.x, ny) && canMoveTo(player.x, ny, player.x, player.y)) player.y = ny;
+                    }
+                }
+                if (player.attackCooldown > 0) player.attackCooldown--;
+            } else {
+                if (player.isMoving) {
+                    const dx = player.targetX - player.x, dy = player.targetY - player.y;
+                    const d = Math.hypot(dx, dy);
+                    if (d < 2) {
+                        player.x = player.targetX; player.y = player.targetY;
+                        player.isMoving = false;
+                        infoText.textContent = `✅ ДОШЁЛ!`;
+                    } else {
+                        const step = Math.min(player.speed, d);
+                        const angle = Math.atan2(dy, dx);
+                        let nx = player.x + Math.cos(angle) * step;
+                        let ny = player.y + Math.sin(angle) * step;
+                        if (player.ghost) {
+                            if (!isBlockedGhost(nx, player.y)) player.x = nx;
+                            if (!isBlockedGhost(player.x, ny)) player.y = ny;
+                        } else {
+                            if (!isBlocked(nx, player.y) && canMoveTo(nx, player.y, player.x, player.y)) player.x = nx;
+                            if (!isBlocked(player.x, ny) && canMoveTo(player.x, ny, player.x, player.y)) player.y = ny;
+                        }
+                    }
+                }
+            }
+
+            // Сбор костей
+            for (let bone of bones) {
+                if (bone.collected) continue;
+                if (dist(player, bone) < player.radius + bone.radius) {
+                    bone.collected = true;
+                    player.energy = Math.min(player.maxEnergy, player.energy + 5 + player.int * 0.2);
+                    addExp(12 + Math.floor(Math.random() * 6));
+                    spawnParticles(bone.x, bone.y, '#ffd700', 20, 4, 25, 5);
+                    updateUI();
+                    infoText.textContent = `🦴 Кость собрана! +опыт`;
+                }
+            }
+
+            if (player.hp < player.maxHp && player.hp > 0) {
+                player.hp = Math.min(player.maxHp, player.hp + 0.02 + player.vit * 0.005);
+                updateUI();
+            }
+            if (player.hp <= 0) {
+                player.hp = 0;
+                player.isMoving = false;
+                player.attacking = false;
+            }
+            updateUI();
+        }
+
+        // ---------- КАМЕРА ----------
+        function updateCamera() {
+            camera.x += ((player.x - W/2) - camera.x) * 0.1;
+            camera.y += ((player.y - H/2) - camera.y) * 0.1;
+            camera.x = Math.max(0, Math.min(WORLD_W - W, camera.x));
+            camera.y = Math.max(0, Math.min(WORLD_H - H, camera.y));
+        }
+
+        // ---------- ОТРИСОВКА ----------
+        function drawGrassDots() {
+            for (let i = 0; i < 400; i++) {
+                const x = (i * 137 + 50) % WORLD_W;
+                const y = (i * 97 + 30) % WORLD_H;
+                const radius = 3 + Math.sin(i * 1.3) * 2;
+                const green = 100 + Math.sin(i * 0.7) * 30;
+                const alpha = 0.3 + Math.sin(i * 0.5) * 0.2;
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(40, ${green}, 40, ${alpha})`;
+                ctx.fill();
+                ctx.strokeStyle = `rgba(30, ${green-20}, 30, ${alpha*0.5})`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            for (let i = 0; i < 300; i++) {
+                const x = (i * 211 + 77) % WORLD_W;
+                const y = (i * 163 + 55) % WORLD_H;
+                const radius = 1.5 + Math.cos(i * 0.9) * 1;
+                const green = 80 + Math.cos(i * 0.5) * 25;
+                const alpha = 0.25 + Math.cos(i * 0.3) * 0.15;
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(30, ${green}, 30, ${alpha})`;
+                ctx.fill();
+            }
+            for (let i = 0; i < 100; i++) {
+                const x = (i * 317 + 111) % WORLD_W;
+                const y = (i * 251 + 77) % WORLD_H;
+                const radius = 5 + Math.sin(i * 0.4) * 3;
+                const green = 70 + Math.sin(i * 0.6) * 20;
+                const alpha = 0.1 + Math.sin(i * 0.2) * 0.08;
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(50, ${green}, 50, ${alpha})`;
+                ctx.fill();
+            }
+        }
+
+        function drawTree(t) {
+            ctx.fillStyle = '#4d3220';
+            ctx.fillRect(t.x - 4, t.y + 5, 8, 20);
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, t.r, 0, Math.PI*2);
+            ctx.fillStyle = '#2a6b2a';
+            ctx.fill();
+            ctx.shadowColor = 'rgba(0,0,0,0.2)';
+            ctx.shadowBlur = 10;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(t.x - 5, t.y - 6, t.r * 0.4, 0, Math.PI*2);
+            ctx.fillStyle = '#3d8d3d';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,0,0,0.1)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3,3]);
+            ctx.beginPath();
+            ctx.arc(t.x, t.y + t.r * 0.3, t.r * 0.7, 0, Math.PI);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawBuilding(b) {
+            ctx.fillStyle = b.color;
+            ctx.shadowColor = 'rgba(0,0,0,0.3)';
+            ctx.shadowBlur = 15;
+            ctx.fillRect(b.x, b.y, b.w, b.h);
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(255,0,0,0.15)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5,5]);
+            ctx.beginPath();
+            ctx.moveTo(b.x, b.y + b.h * 0.6);
+            ctx.lineTo(b.x + b.w, b.y + b.h * 0.6);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            for (let i=0; i<3; i++) for (let j=0; j<2; j++) {
+                const wx = b.x + 15 + i*(b.w/4), wy = b.y + 15 + j*(b.h/3);
+                if (wx+15 < b.x+b.w-10 && wy+15 < b.y+b.h-10) {
+                    ctx.fillStyle = (i+j)%2===0 ? '#e6f0fa' : '#8fb4d4';
+                    ctx.fillRect(wx, wy, 15, 15);
+                    ctx.fillStyle = '#4a5a6a';
+                    ctx.fillRect(wx+4, wy+4, 2, 7);
+                    ctx.fillRect(wx+9, wy+4, 2, 7);
+                }
+            }
+            ctx.beginPath();
+            ctx.moveTo(b.x-5, b.y);
+            ctx.lineTo(b.x+b.w/2, b.y-25);
+            ctx.lineTo(b.x+b.w+5, b.y);
+            ctx.fillStyle = '#8b3a2a';
+            ctx.fill();
+        }
+
+        function drawBone(bone, time) {
+            if (bone.collected) return;
+            const px = bone.x, py = bone.y + Math.sin(time*0.002 + bone.phase)*3;
+            const scale = 1 + Math.sin(time*0.003 + bone.phase)*0.08;
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.scale(scale, scale);
+            const grad = ctx.createRadialGradient(0,0,2,0,0,22);
+            grad.addColorStop(0, 'rgba(255,215,0,0.3)');
+            grad.addColorStop(1, 'rgba(255,215,0,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0,0,22,0,Math.PI*2);
+            ctx.fill();
+            ctx.font = '28px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffd700';
+            ctx.shadowColor = 'rgba(255,215,0,0.5)';
+            ctx.shadowBlur = 15;
+            ctx.fillText('🦴', 0, 2);
+            ctx.shadowBlur = 0;
+            ctx.restore();
+        }
+
+        function drawPeasant(p, time) {
+            if (!p.alive) return;
+            const px = p.x, py = p.y + Math.sin(time*0.002 + p.phase)*2;
+            ctx.shadowColor = 'rgba(0,0,0,0.2)';
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = '#b89a7a';
+            ctx.beginPath();
+            ctx.arc(px, py-5, 16, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#6d4c34';
+            ctx.fillRect(px-14, py-2, 28, 24);
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(px-6, py-10, 5, 0, Math.PI*2);
+            ctx.arc(px+6, py-10, 5, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#cc2222';
+            ctx.beginPath();
+            ctx.arc(px-5, py-9, 3, 0, Math.PI*2);
+            ctx.arc(px+7, py-9, 3, 0, Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle = '#5a3a1a';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(px+16, py-10);
+            ctx.lineTo(px+30, py-30);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(px+30, py-30);
+            ctx.lineTo(px+24, py-36);
+            ctx.moveTo(px+30, py-30);
+            ctx.lineTo(px+36, py-36);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(px-20, py-38, 40, 8);
+            const hpPercent = p.hp / p.maxHp;
+            ctx.fillStyle = hpPercent > 0.5 ? '#44cc44' : '#cc4444';
+            ctx.fillRect(px-19, py-37, hpPercent * 38, 6);
+            ctx.fillStyle = 'rgba(255,215,0,0.6)';
+            ctx.font = '8px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Lv.${p.level}`, px, py - 42);
+            if (p.state === 'chase') {
+                ctx.strokeStyle = 'rgba(255,0,0,0.3)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4,4]);
+                ctx.beginPath();
+                ctx.arc(px, py, p.attackRange, 0, Math.PI*2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+            if (player.race === 'zombie' && player.abilityActive && dist(player, p) < 160) {
+                ctx.strokeStyle = 'rgba(0,255,0,0.2)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(px, py, 22, 0, Math.PI*2);
+                ctx.stroke();
+            }
+        }
+
+        function drawSkeleton(px, py) {
+            if (player.invisible) ctx.globalAlpha = 0.3;
+            ctx.shadowColor = 'rgba(0,0,0,0.2)';
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.beginPath();
+            ctx.ellipse(px, py+32, 18, 6, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#e8e0d0';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(px, py-14);
+            ctx.lineTo(px, py+16);
+            ctx.stroke();
+            ctx.fillStyle = '#e0d8c8';
+            ctx.beginPath();
+            ctx.arc(px, py-18, 15, 0, Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle = '#b0a898';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath();
+            ctx.arc(px-7, py-22, 3.5, 0, Math.PI*2);
+            ctx.arc(px+7, py-22, 3.5, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(px, py-13, 7, 0.1, Math.PI-0.1);
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.strokeStyle = '#d0c8b8';
+            ctx.lineWidth = 3;
+            for (let i=0; i<4; i++) { const ry = py-4 + i*5.5;
+                ctx.beginPath();
+                ctx.moveTo(px-12, ry);
+                ctx.lineTo(px+12, ry);
+                ctx.stroke();
+            }
+            ctx.strokeStyle = '#d8d0c0';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(px-12, py-2);
+            ctx.lineTo(px-26, py-10);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(px+12, py-2);
+            ctx.lineTo(px+26, py-10);
+            ctx.stroke();
+            ctx.strokeStyle = '#c8c0b0';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(px-5, py+16);
+            ctx.lineTo(px-12, py+32);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(px+5, py+16);
+            ctx.lineTo(px+12, py+32);
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        }
+
+        function drawZombie(px, py) {
+            if (player.invisible) ctx.globalAlpha = 0.3;
+            ctx.shadowColor = 'rgba(0,0,0,0.2)';
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.beginPath();
+            ctx.ellipse(px, py+32, 18, 6, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#2d5a2d';
+            ctx.fillRect(px-14, py-6, 28, 28);
+            ctx.fillStyle = '#3d7a3d';
+            ctx.beginPath();
+            ctx.arc(px, py-12, 16, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#cc2222';
+            ctx.beginPath();
+            ctx.arc(px-6, py-16, 4, 0, Math.PI*2);
+            ctx.arc(px+6, py-16, 4, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#ff4444';
+            ctx.beginPath();
+            ctx.arc(px-5, py-15, 2, 0, Math.PI*2);
+            ctx.arc(px+7, py-15, 2, 0, Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle = '#1a3a1a';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(px, py-6, 8, 0.2, Math.PI-0.2);
+            ctx.stroke();
+            ctx.strokeStyle = '#2d5a2d';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(px-14, py+2);
+            ctx.lineTo(px-28, py-8);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(px+14, py+2);
+            ctx.lineTo(px+28, py-8);
+            ctx.stroke();
+            ctx.strokeStyle = '#1a4a1a';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(px-6, py+22);
+            ctx.lineTo(px-14, py+36);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(px+6, py+22);
+            ctx.lineTo(px+14, py+36);
+            ctx.stroke();
+            ctx.fillStyle = '#3a4a3a';
+            ctx.fillRect(px-16, py-4, 32, 6);
+            ctx.fillRect(px-12, py+6, 24, 4);
+            ctx.globalAlpha = 1.0;
+        }
+
+        function drawShadow(px, py, time) {
+            ctx.globalAlpha = 0.2;
+            ctx.shadowColor = 'rgba(100, 100, 255, 0.5)';
+            ctx.shadowBlur = 30;
+            const grad = ctx.createRadialGradient(px, py-10, 5, px, py-10, 30);
+            grad.addColorStop(0, 'rgba(180, 180, 255, 0.6)');
+            grad.addColorStop(0.5, 'rgba(100, 100, 220, 0.4)');
+            grad.addColorStop(1, 'rgba(50, 50, 150, 0.1)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.ellipse(px, py-8, 22, 28, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(150, 150, 255, 0.3)';
+            ctx.beginPath();
+            ctx.arc(px, py-20, 16, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = 'rgba(200, 200, 255, 0.8)';
+            ctx.fillStyle = 'rgba(200, 200, 255, 0.5)';
+            ctx.beginPath();
+            ctx.arc(px-7, py-24, 5, 0, Math.PI*2);
+            ctx.arc(px+7, py-24, 5, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(100, 100, 200, 0.15)';
+            ctx.lineWidth = 2;
+            for (let i=0; i<5; i++) {
+                const angle = time*0.001 + i*1.2;
+                const rx = 20 + Math.sin(angle)*8;
+                const ry = 30 + Math.cos(angle*0.7)*6;
+                ctx.beginPath();
+                ctx.moveTo(px + Math.cos(angle)*rx, py + Math.sin(angle)*ry - 5);
+                ctx.quadraticCurveTo(
+                    px + Math.cos(angle+0.3)*(rx+12),
+                    py + Math.sin(angle+0.3)*(ry+10) + 5,
+                    px + Math.cos(angle+0.6)*(rx+8),
+                    py + Math.sin(angle+0.6)*(ry+8) + 12
+                );
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1.0;
+            ctx.shadowBlur = 0;
+        }
+
+        // Отрисовка партиклов
+        function drawParticles() {
+            for (let p of particles) {
+                const alpha = p.life / p.maxLife;
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = p.color;
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
+        }
+
+        function draw(time) {
+            ctx.clearRect(0,0,W,H);
+            ctx.fillStyle = '#1a2a3a';
+            ctx.fillRect(0,0,W,H);
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            drawGrassDots();
+
+            const objects = [];
+            for (let b of buildings) objects.push({ type:'building', data:b, sortY:b.y+b.h, draw:drawBuilding });
+            for (let t of trees) objects.push({ type:'tree', data:t, sortY:t.y+t.r*0.6, draw:drawTree });
+            for (let bone of bones) if (!bone.collected) objects.push({ type:'bone', data:bone, sortY:bone.y+bone.radius, draw:(d)=>drawBone(d,time) });
+            for (let p of peasants) if (p.alive) objects.push({ type:'peasant', data:p, sortY:p.y+20, draw:(d)=>drawPeasant(d,time) });
+            
+            const playerObj = {
+                type:'player',
+                data:player,
+                sortY:player.y+20,
+                draw: (d) => {
+                    if (player.race === 'skeleton') drawSkeleton(d.x, d.y);
+                    else if (player.race === 'zombie') drawZombie(d.x, d.y);
+                    else if (player.race === 'shadow') drawShadow(d.x, d.y, time);
+                }
+            };
+            objects.push(playerObj);
+            
+            objects.sort((a,b)=>a.sortY - b.sortY);
+            for (let obj of objects) obj.draw(obj.data);
+
+            // Область чумы
+            if (player.race === 'zombie' && player.abilityActive) {
+                ctx.fillStyle = 'rgba(0,255,0,0.08)';
+                ctx.strokeStyle = 'rgba(0,255,0,0.2)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, 160, 0, Math.PI*2);
+                ctx.fill();
+                ctx.stroke();
+                for (let i = 0; i < 12; i++) {
+                    const angle = time*0.001 + i * 0.5;
+                    const dist2 = 80 + Math.sin(time*0.002 + i) * 40;
+                    const x = player.x + Math.cos(angle) * dist2;
+                    const y = player.y + Math.sin(angle) * dist2;
+                    ctx.fillStyle = `rgba(0,255,0,${0.1 + Math.sin(time*0.003 + i)*0.05})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 3 + Math.sin(time*0.004 + i)*2, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+
+            // Отрисовка партиклов
+            drawParticles();
+
+            if (player.isMoving) {
+                ctx.strokeStyle = 'rgba(255, 200, 50, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 8]);
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(player.targetX, player.targetY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = 'rgba(255, 200, 50, 0.4)';
+                ctx.beginPath();
+                ctx.arc(player.targetX, player.targetY, 10, 0, Math.PI*2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 200, 50, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            if (player.attacking && player.attackTarget && player.attackTarget.alive) {
+                ctx.strokeStyle = 'rgba(255, 50, 50, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6,6]);
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(player.attackTarget.x, player.attackTarget.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            ctx.restore();
+
+            const remaining = bones.filter(b=>!b.collected).length;
+            ctx.fillStyle = 'rgba(255,215,0,0.3)';
+            ctx.font = '12px sans-serif';
+            ctx.fillText(`🦴 ${remaining}  |  Крестьян: ${peasants.filter(p=>p.alive).length}  |  Ур.${player.level}`, 12, 30);
+        }
+
+        // ---------- ОБНОВЛЕНИЕ ПАРТИКЛОВ ----------
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.05;
+                p.life--;
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // ---------- ОБРАБОТКА ВВОДА ----------
+        function handleClick(e) {
+            if (!raceChosen) return;
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let clientX, clientY;
+            if (e.touches) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
+            else { clientX = e.clientX; clientY = e.clientY; }
+            const canvasX = (clientX - rect.left) * scaleX;
+            const canvasY = (clientY - rect.top) * scaleY;
+            const worldX = canvasX + camera.x;
+            const worldY = canvasY + camera.y;
+            setTarget(worldX, worldY);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                useAbility();
+            }
+        });
+
+        canvas.addEventListener('mousedown', handleClick);
+        canvas.addEventListener('touchstart', handleClick, { passive: false });
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            player.isMoving = false;
+            player.attacking = false;
+            player.attackTarget = null;
+            infoText.textContent = `⏹️ ОСТАНОВЛЕН`;
+        });
+
+        // ---------- ЦИКЛ ИГРЫ ----------
+        function gameLoop(time) {
+            if (raceChosen) {
+                updateGame();
+                updateCamera();
+                updateParticles();
+            }
+            draw(time);
+            requestAnimationFrame(gameLoop);
+        }
+
+        setTimeout(() => {
+            if (raceChosen) setTarget(400, 300);
+        }, 500);
+
+        gameLoop(0);
+        console.log('✅ Добавлены спецэффекты: партиклы, вспышки атак, свечение способностей!');
+    </script>
+</body>
+</html>
